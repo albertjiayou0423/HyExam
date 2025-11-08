@@ -52,7 +52,7 @@ router.post(
 
       jwt.sign(
         payload,
-        'your_jwt_secret', // In production, this should be in a config file
+        process.env.JWT_SECRET,
         { expiresIn: 360000 },
         (err, token) => {
           if (err) throw err;
