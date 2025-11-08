@@ -3,6 +3,7 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import Login from './components/Login';
 import Register from './components/Register';
 import TeacherDashboard from './components/TeacherDashboard';
+import HealthCheck from './components/HealthCheck';
 
 function App() {
   const [token, setToken] = useState(null);
@@ -29,6 +30,7 @@ function App() {
           path="/dashboard"
           element={token ? <TeacherDashboard setToken={setToken} /> : <Navigate to="/login" />}
         />
+        <Route path="/health" element={<HealthCheck />} />
         <Route
           path="/"
           element={<Navigate to={token ? "/dashboard" : "/login"} />}
