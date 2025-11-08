@@ -11,6 +11,14 @@ app.get('/', (req, res) => {
   res.json({ message: 'Welcome to the Online Exam System API.' });
 });
 
+// Define Routes
+app.use('/api/users', require('./routes/users'));
+app.use('/api/auth', require('./routes/auth'));
+app.use('/api/classes', require('./routes/classes'));
+app.use('/api/questions', require('./routes/questions'));
+app.use('/api/exams', require('./routes/exams'));
+app.use('/api/submissions', require('./routes/submissions'));
+
 const PORT = process.env.PORT || 5000;
 
 app.listen(PORT, () => {
