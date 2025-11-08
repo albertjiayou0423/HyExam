@@ -73,11 +73,155 @@ router.post('/submit/:submissionId', auth, async (req, res) => {
         submission.submittedTime = Date.now();
         submission.status = 'submitted';
 
+        // --- Auto-grading logic starts here ---
+        const examDetails = await Exam.findById(submission.exam).populate('questions');
+        let score = 0;
+        let pendingGrading = false; // Flag for subjective questions
+
+        for (const studentAnswer of submission.answers) {
+            const question = examDetails.questions.find(q => q._id.toString() === studentAnswer.questionId.toString());
+            if (!question) continue;
+
+            const questionType = question.questionType;
+            if (questionType === 'single' || questionType === 'true_false') {
+                if (studentAnswer.answer === question.correctAnswer) {
+                    score++; // Assuming 1 point per question
+                }
+            } else if (questionType === 'multiple') {
+                // For multiple choice, expecting answer to be an array of strings
+                const correct = Array.isArray(question.correctAnswer) ? question.correctAnswer : [question.correctAnswer];
+                const submitted = Array.isArray(studentAnswer.answer) ? studentAnswer.answer : [studentAnswer.answer];
+                if (correct.length === submitted.length && correct.every(val => submitted.includes(val))) {
+                    score++;
+                }
+            } else if (questionType === 'fill_in_the_blank' || questionType === 'essay') {
+                pendingGrading = true;
+            }
+        }
+
+        submission.score = score;
+        if (!pendingGrading) {
+            submission.status = 'graded';
+        }
+        // --- Auto-grading logic ends here ---
+
         await submission.save();
 
-        // Auto-grading can be triggered here in a real-world scenario
-        res.json({ msg: 'Exam submitted successfully.' });
+        res.json({ msg: 'Exam submitted successfully. Auto-grading complete.' });
 
+    } catch (err) {
+        console.error(err.message);
+        res.status(500).send('Server Error');
+    }
+});
+
+// @route   GET api/submissions/myresults
+// @desc    Get all graded submissions for the logged-in student
+// @access  Private (Student)
+router.get('/myresults', auth, async (req, res) => {
+    if (req.user.role !== 'student') {
+        return res.status(403).json({ msg: 'Only students can view their results.' });
+    }
+    try {
+        const submissions = await Submission.find({ student: req.user.id, status: 'graded' })
+            .populate('exam', ['name']);
+        res.json(submissions);
+    } catch (err) {
+        console.error(err.message);
+        res.status(500).send('Server Error');
+    }
+});
+
+// @route   GET api/submissions/exam/:examId
+// @desc    Get all submissions for an exam (for teachers)
+// @access  Private (Teacher or Admin)
+router.get('/exam/:examId', auth, async (req, res) => {
+    if (req.user.role !== 'teacher' && req.user.role !== 'admin') {
+        return res.status(403).json({ msg: 'Access denied' });
+    }
+
+    try {
+        const submissions = await Submission.find({ exam: req.params.examId }).populate('student', ['name', 'email']);
+        res.json(submissions);
+    } catch (err) {
+        console.error(err.message);
+        res.status(500).send('Server Error');
+    }
+});
+
+// @route   GET api/submissions/:submissionId
+// @desc    Get a single submission details (for grading)
+// @access  Private (Teacher or Admin)
+router.get('/:submissionId', auth, async (req, res) => {
+    if (req.user.role !== 'teacher' && req.user.role !== 'admin') {
+        return res.status(403).json({ msg: 'Access denied' });
+    }
+
+    try {
+        const submission = await Submission.findById(req.params.submissionId)
+            .populate('student', ['name'])
+            .populate({
+                path: 'exam',
+                populate: {
+                    path: 'questions'
+                }
+            });
+
+        if (!submission) {
+            return res.status(404).json({ msg: 'Submission not found' });
+        }
+        res.json(submission);
+    } catch (err) {
+        console.error(err.message);
+        res.status(500).send('Server Error');
+    }
+});
+
+// @route   POST api/submissions/grade/:submissionId
+// @desc    Grade a submission (specifically for subjective questions)
+// @access  Private (Teacher or Admin)
+router.post('/grade/:submissionId', auth, async (req, res) => {
+    if (req.user.role !== 'teacher' && req.user.role !== 'admin') {
+        return res.status(403).json({ msg: 'Access denied' });
+    }
+
+    const { subjectiveScores } = req.body; // Expecting an array of { questionId, score }
+
+    try {
+        const submission = await Submission.findById(req.params.submissionId);
+        if (!submission) {
+            return res.status(404).json({ msg: 'Submission not found' });
+        }
+
+        let finalScore = submission.score; // Start with the auto-graded score
+        for (const item of subjectiveScores) {
+            finalScore += item.score;
+        }
+
+        submission.score = finalScore;
+        submission.status = 'graded'; // Mark as fully graded
+
+        await submission.save();
+        res.json(submission);
+
+    } catch (err) {
+        console.error(err.message);
+        res.status(500).send('Server Error');
+    }
+});
+
+
+// @route   GET api/submissions/myresults
+// @desc    Get all graded submissions for the logged-in student
+// @access  Private (Student)
+router.get('/myresults', auth, async (req, res) => {
+    if (req.user.role !== 'student') {
+        return res.status(403).json({ msg: 'Only students can view their results.' });
+    }
+    try {
+        const submissions = await Submission.find({ student: req.user.id, status: 'graded' })
+            .populate('exam', ['name']);
+        res.json(submissions);
     } catch (err) {
         console.error(err.message);
         res.status(500).send('Server Error');
