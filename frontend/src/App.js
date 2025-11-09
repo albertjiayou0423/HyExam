@@ -3,36 +3,43 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import Login from './components/Login';
 import Register from './components/Register';
 import TeacherDashboard from './components/TeacherDashboard';
+import HealthCheck from './components/HealthCheck';
+import { supabase } from './supabaseClient';
 
 function App() {
-  const [token, setToken] = useState(null);
+  const [session, setSession] = useState(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const storedToken = localStorage.getItem('token');
-    if (storedToken) {
-      setToken(storedToken);
-    }
+    // Check for an active session right away
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session);
+      // setLoading will be handled by the onAuthStateChange listener to prevent race conditions
+    });
+
+    // onAuthStateChange provides the definitive auth state.
+    // It fires once on load, and again whenever the state changes.
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setSession(session);
+      setLoading(false); // Set loading to false only after the auth state is confirmed.
+    });
+
+    // Cleanup subscription on unmount
+    return () => subscription.unsubscribe();
   }, []);
+
+  if (loading) {
+    return <div>Loading...</div>; // Or a proper spinner component
+  }
 
   return (
     <Router>
       <Routes>
-        <Route
-          path="/login"
-          element={!token ? <Login setToken={setToken} /> : <Navigate to="/dashboard" />}
-        />
-        <Route
-          path="/register"
-          element={!token ? <Register setToken={setToken} /> : <Navigate to="/dashboard" />}
-        />
-        <Route
-          path="/dashboard"
-          element={token ? <TeacherDashboard setToken={setToken} /> : <Navigate to="/login" />}
-        />
-        <Route
-          path="/"
-          element={<Navigate to={token ? "/dashboard" : "/login"} />}
-        />
+        <Route path="/login" element={!session ? <Login /> : <Navigate to="/" />} />
+        <Route path="/register" element={!session ? <Register /> : <Navigate to="/" />} />
+        <Route path="/dashboard" element={session ? <TeacherDashboard /> : <Navigate to="/login" />} />
+        <Route path="/health" element={<HealthCheck />} />
+        <Route path="/" element={session ? <Navigate to="/dashboard" /> : <Navigate to="/login" />} />
       </Routes>
     </Router>
   );
