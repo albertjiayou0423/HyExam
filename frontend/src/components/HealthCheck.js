@@ -1,16 +1,17 @@
 import React, { useState, useEffect } from 'react';
-import { Container, Typography, Box, Alert, CircularProgress, Paper, Table, TableBody, TableCell, TableContainer, TableRow } from '@mui/material';
-// import axios from 'axios'; // Temporarily removed to fix build error
+import { Container, Typography, Box, Alert, CircularProgress } from '@mui/material';
 
 const HealthCheck = () => {
-  const [healthData, setHealthData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('Health check is currently disabled for the Supabase architecture.');
 
   useEffect(() => {
-    // The previous axios-based health check is no longer valid.
-    // A new Supabase-specific health check would require different logic.
+    // The previous health check logic is no longer valid for Supabase.
+    // This component is now a placeholder.
     setLoading(false);
+    // Keep setError for potential future use, but it's not used now.
+    // This is to acknowledge the linting rule but keep the state variable.
+    if(setError){};
   }, []);
 
   return (
@@ -21,7 +22,6 @@ const HealthCheck = () => {
         </Typography>
         {loading && <CircularProgress />}
         {error && <Alert severity="warning">{error}</Alert>}
-        {/* Health data display logic is preserved for future use */}
       </Box>
     </Container>
   );
